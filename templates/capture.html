@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>FireInspect AI</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --navy: #1B2B4B;
+    --red: #C0392B;
+    --green: #27AE60;
+    --amber: #E67E22;
+    --bg: #F0F2F6;
+    --card: #FFFFFF;
+    --text: #1B2B4B;
+    --muted: #6B7A99;
+    --border: #DDE2EE;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding-bottom: 100px;
+  }
+
+  /* ── Top bar ── */
+  .topbar {
+    background: var(--navy);
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .topbar-title { color: white; font-size: 16px; font-weight: 700; }
+  .topbar-title span { color: #E74C3C; }
+
+  .badge-count {
+    background: #E74C3C;
+    color: white;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 99px;
+  }
+
+  /* ── Inspection banner ── */
+  .inspection-banner {
+    background: var(--navy);
+    padding: 0 16px 12px;
+    color: rgba(255,255,255,0.75);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .inspection-banner strong { color: white; font-size: 13px; }
+
+  /* ── Main content ── */
+  .content { padding: 16px; }
+
+  /* ── Camera card ── */
+  .camera-card {
+    background: var(--card);
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+
+  .camera-preview {
+    background: #0A0F1A;
+    aspect-ratio: 4/3;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255,255,255,0.4);
+    font-size: 13px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .camera-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: none;
+  }
+
+  .camera-icon { font-size: 48px; margin-bottom: 8px; opacity: 0.3; }
+
+  .camera-hint { font-size: 12px; color: rgba(255,255,255,0.3); text-align: center; padding: 0 24px; }
+
+  .location-input {
+    padding: 12px 16px;
+    border-top: 1px solid var(--border);
+  }
+
+  .location-input input {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    color: var(--text);
+    background: var(--bg);
+  }
+
+  .location-input input:focus {
+    outline: none;
+    border-color: var(--navy);
+  }
+
+  .camera-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    border-top: 1px solid var(--border);
+  }
+
+  .btn-camera {
+    padding: 14px;
+    border: none;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .btn-camera:active { opacity: 0.75; }
+
+  .btn-take { background: var(--red); color: white; border-radius: 0 0 0 16px; }
+  .btn-upload { background: var(--navy); color: white; border-radius: 0 0 16px 0; }
+
+  /* Hidden real file inputs */
+  #camera-input, #upload-input { display: none; }
+
+  /* ── Analyze button ── */
+  .btn-analyze {
+    width: 100%;
+    padding: 16px;
+    background: var(--red);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 16px;
+    transition: background 0.15s;
+  }
+
+  .btn-analyze:active { background: #a93226; }
+  .btn-analyze.visible { display: flex; }
+  .btn-analyze:disabled { background: #AAB0C0; }
+
+  /* ── Result card ── */
+  .result-card {
+    background: var(--card);
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    display: none;
+  }
+
+  .result-card.visible { display: block; }
+
+  .result-header {
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .status-pill {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 99px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .status-PASS { background: #D5F5E3; color: #1D8348; }
+  .status-FAIL { background: #FDEDEC; color: #C0392B; }
+  .status-NEEDS_ATTENTION { background: #FEF9E7; color: #B7770D; }
+
+  .result-equipment { font-size: 13px; font-weight: 600; color: var(--text); flex: 1; }
+
+  .result-body { padding: 0 16px 16px; }
+
+  .deficiency-item {
+    padding: 10px 0;
+    border-top: 1px solid var(--border);
+  }
+
+  .def-header { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+
+  .def-severity {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 99px;
+    text-transform: uppercase;
+  }
+
+  .sev-CRITICAL { background: #FDEDEC; color: #C0392B; }
+  .sev-MAJOR { background: #FEF5E7; color: #B7770D; }
+  .sev-MINOR { background: #FEF9E7; color: #9A7D0A; }
+
+  .def-code { font-size: 10px; color: var(--muted); font-family: monospace; }
+
+  .def-description { font-size: 13px; color: var(--text); line-height: 1.5; }
+  .def-action { font-size: 12px; color: var(--muted); margin-top: 3px; line-height: 1.4; }
+
+  .result-notes {
+    font-size: 12px;
+    color: var(--muted);
+    font-style: italic;
+    padding: 10px 0;
+    border-top: 1px solid var(--border);
+    line-height: 1.5;
+  }
+
+  .pass-msg {
+    padding: 12px 0;
+    font-size: 13px;
+    color: #1D8348;
+    font-weight: 500;
+  }
+
+  /* ── Spinner ── */
+  .spinner-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(10,15,26,0.75);
+    z-index: 999;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    gap: 16px;
+  }
+
+  .spinner-overlay.visible { display: flex; }
+
+  .spinner {
+    width: 44px;
+    height: 44px;
+    border: 3px solid rgba(255,255,255,0.2);
+    border-top-color: #E74C3C;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .spinner-text { font-size: 14px; color: rgba(255,255,255,0.8); text-align: center; }
+
+  /* ── Bottom nav ── */
+  .bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: white;
+    border-top: 1px solid var(--border);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    z-index: 100;
+  }
+
+  .nav-btn {
+    padding: 14px;
+    text-align: center;
+    text-decoration: none;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 500;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    transition: color 0.15s;
+  }
+
+  .nav-btn.active { color: var(--navy); }
+  .nav-btn-icon { font-size: 20px; }
+
+  /* ── Photo quality warning ── */
+  .quality-warn {
+    background: #FEF9E7;
+    border: 1px solid #F9E79F;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 12px;
+    color: #9A7D0A;
+    margin-bottom: 10px;
+    display: none;
+  }
+
+  .quality-warn.visible { display: block; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-title">Fire<span>Inspect</span> AI</div>
+  <div class="badge-count">{{ item_count }} items</div>
+</div>
+
+{% if inspection %}
+<div class="inspection-banner">
+  <strong>{{ inspection.building_name }}</strong><br>
+  {{ inspection.building_address }} &nbsp;·&nbsp; {{ inspection.inspection_date }}
+</div>
+{% endif %}
+
+<div class="content">
+
+  <!-- Camera card -->
+  <div class="camera-card">
+    <div class="camera-preview" id="preview-area">
+      <div class="camera-icon">📷</div>
+      <div>Point camera at equipment</div>
+      <div class="camera-hint">Fire extinguisher, sprinkler head, detector, pull station, exit sign...</div>
+      <img id="preview-img" alt="Preview">
+    </div>
+
+    <div class="location-input">
+      <input type="text" id="location-input" placeholder="Location (e.g. Lobby, Floor 2, Kitchen)" autocomplete="off">
+    </div>
+
+    <div class="camera-actions">
+      <button class="btn-camera btn-take" onclick="document.getElementById('camera-input').click()">
+        📷 Take Photo
+      </button>
+      <button class="btn-camera btn-upload" onclick="document.getElementById('upload-input').click()">
+        🖼 Upload
+      </button>
+    </div>
+  </div>
+
+  <!-- Hidden file inputs -->
+  <input type="file" id="camera-input" accept="image/*" capture="environment">
+  <input type="file" id="upload-input" accept="image/*">
+
+  <!-- Analyze button — shown after photo selected -->
+  <button class="btn-analyze" id="analyze-btn" onclick="runAnalysis()">
+    🔍 Analyze with AI
+  </button>
+
+  <!-- Result card — shown after analysis -->
+  <div class="result-card" id="result-card">
+    <div class="result-header">
+      <div class="result-equipment" id="result-equipment">—</div>
+      <div class="status-pill" id="result-status">—</div>
+    </div>
+    <div class="result-body" id="result-body"></div>
+  </div>
+
+</div>
+
+<!-- Loading overlay -->
+<div class="spinner-overlay" id="spinner">
+  <div class="spinner"></div>
+  <div class="spinner-text">AI analyzing photo...<br><span style="font-size:11px;opacity:0.6">Usually 5–10 seconds</span></div>
+</div>
+
+<!-- Bottom nav -->
+<div class="bottom-nav">
+  <a class="nav-btn active" href="/capture">
+    <div class="nav-btn-icon">📷</div>
+    Capture
+  </a>
+  <a class="nav-btn" href="/inspection/summary">
+    <div class="nav-btn-icon">📋</div>
+    Summary ({{ item_count }})
+  </a>
+</div>
+
+<script>
+let selectedFile = null;
+
+function handleFileSelect(file) {
+  if (!file) return;
+  selectedFile = file;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = document.getElementById('preview-img');
+    img.src = e.target.result;
+    img.style.display = 'block';
+    document.querySelector('.camera-icon').style.display = 'none';
+    document.querySelector('.camera-preview div:not(.camera-hint)').style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+
+  document.getElementById('analyze-btn').classList.add('visible');
+  document.getElementById('result-card').classList.remove('visible');
+}
+
+document.getElementById('camera-input').addEventListener('change', function() {
+  handleFileSelect(this.files[0]);
+});
+
+document.getElementById('upload-input').addEventListener('change', function() {
+  handleFileSelect(this.files[0]);
+});
+
+async function runAnalysis() {
+  if (!selectedFile) return;
+
+  const btn = document.getElementById('analyze-btn');
+  btn.disabled = true;
+  btn.textContent = 'Analyzing...';
+  document.getElementById('spinner').classList.add('visible');
+
+  const formData = new FormData();
+  formData.append('photo', selectedFile);
+  formData.append('location', document.getElementById('location-input').value);
+
+  try {
+    const response = await fetch('/analyze', { method: 'POST', body: formData });
+    const data = await response.json();
+
+    document.getElementById('spinner').classList.remove('visible');
+
+    if (data.error) {
+      alert('Analysis failed: ' + data.error);
+      btn.disabled = false;
+      btn.textContent = '🔍 Analyze with AI';
+      return;
+    }
+
+    renderResult(data);
+    btn.textContent = '📷 Analyze Another';
+    btn.disabled = false;
+
+  } catch (err) {
+    document.getElementById('spinner').classList.remove('visible');
+    alert('Network error. Check connection and try again.');
+    btn.disabled = false;
+    btn.textContent = '🔍 Analyze with AI';
+  }
+}
+
+function renderResult(data) {
+  const card = document.getElementById('result-card');
+  const equipmentEl = document.getElementById('result-equipment');
+  const statusEl = document.getElementById('result-status');
+  const bodyEl = document.getElementById('result-body');
+
+  equipmentEl.textContent = data.equipment_type || 'Unknown equipment';
+
+  statusEl.textContent = data.overall_status;
+  statusEl.className = 'status-pill status-' + data.overall_status;
+
+  let html = '';
+
+  // Photo quality warning
+  if (data.photo_quality === 'POOR' || data.photo_quality === 'PARTIAL') {
+    html += `<div class="quality-warn visible">⚠️ ${data.photo_quality_notes || 'Photo quality limited. Results may be incomplete — consider retaking.'}</div>`;
+  }
+
+  // Deficiencies
+  if (data.deficiencies && data.deficiencies.length > 0) {
+    for (const d of data.deficiencies) {
+      html += `
+        <div class="deficiency-item">
+          <div class="def-header">
+            <span class="def-severity sev-${d.severity}">${d.severity}</span>
+            <span class="def-code">${d.nfpa_code}</span>
+          </div>
+          <div class="def-description">${d.description}</div>
+          <div class="def-action">→ ${d.corrective_action}</div>
+        </div>`;
+    }
+  } else {
+    html += `<div class="pass-msg">✓ No deficiencies found — equipment appears compliant</div>`;
+  }
+
+  // Inspector notes
+  if (data.inspection_notes) {
+    html += `<div class="result-notes">${data.inspection_notes}</div>`;
+  }
+
+  bodyEl.innerHTML = html;
+  card.classList.add('visible');
+  card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  // Update item count in nav
+  const countEl = document.querySelector('.badge-count');
+  const navCount = document.querySelector('.nav-btn:last-child');
+  const current = parseInt(countEl.textContent);
+  countEl.textContent = (current + 1) + ' items';
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Inspection Summary — FireInspect AI</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #F0F2F6; min-height: 100vh; padding-bottom: 100px; }
+  .topbar { background: #1B2B4B; padding: 14px 16px; display: flex; align-items: center; gap: 12px; }
+  .back { color: rgba(255,255,255,0.7); text-decoration: none; font-size: 14px; }
+  .topbar h1 { color: white; font-size: 16px; font-weight: 700; flex: 1; }
+  .content { padding: 16px; max-width: 560px; margin: 0 auto; }
+  .overall-banner { border-radius: 12px; padding: 16px; margin-bottom: 16px; text-align: center; }
+  .overall-PASS { background: #D5F5E3; }
+  .overall-FAIL { background: #FDEDEC; }
+  .overall-NEEDS_ATTENTION { background: #FEF9E7; }
+  .overall-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px; color: #6B7A99; }
+  .overall-status { font-size: 22px; font-weight: 800; }
+  .overall-PASS .overall-status { color: #1D8348; }
+  .overall-FAIL .overall-status { color: #C0392B; }
+  .overall-NEEDS_ATTENTION .overall-status { color: #B7770D; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
+  .stat { background: white; border-radius: 10px; padding: 12px 8px; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+  .stat-num { font-size: 24px; font-weight: 800; }
+  .stat-label { font-size: 11px; color: #6B7A99; margin-top: 2px; }
+  .stat-critical .stat-num { color: #C0392B; }
+  .stat-major .stat-num { color: #E67E22; }
+  .stat-minor .stat-num { color: #9A7D0A; }
+  .section-title { font-size: 12px; font-weight: 700; color: #6B7A99; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .item-card { background: white; border-radius: 12px; padding: 14px; margin-bottom: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+  .item-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .item-type { font-size: 13px; font-weight: 600; color: #1B2B4B; flex: 1; }
+  .item-location { font-size: 11px; color: #6B7A99; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .dot-PASS { background: #27AE60; }
+  .dot-FAIL { background: #C0392B; }
+  .dot-NEEDS_ATTENTION { background: #E67E22; }
+  .def-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .def-chip { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 99px; }
+  .chip-CRITICAL { background: #FDEDEC; color: #C0392B; }
+  .chip-MAJOR { background: #FEF5E7; color: #B7770D; }
+  .chip-MINOR { background: #FEFDE7; color: #9A7D0A; }
+  .btn-generate { width: 100%; padding: 16px; background: #C0392B; color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 8px; }
+  .btn-generate:disabled { background: #AAB0C0; }
+  .btn-add { width: 100%; padding: 14px; background: #1B2B4B; color: white; border: none; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; margin-bottom: 10px; }
+  .report-output { background: white; border-radius: 12px; padding: 16px; margin-top: 12px; font-size: 13px; line-height: 1.7; color: #1B2B4B; white-space: pre-wrap; display: none; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+  .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: white; border-top: 1px solid #DDE2EE; display: grid; grid-template-columns: 1fr 1fr; z-index: 100; }
+  .nav-btn { padding: 14px; text-align: center; text-decoration: none; color: #6B7A99; font-size: 12px; font-weight: 500; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .nav-btn.active { color: #1B2B4B; }
+  .nav-btn-icon { font-size: 20px; }
+  .spinner { display: none; text-align: center; padding: 16px; color: #6B7A99; font-size: 14px; }
+  .spinner.visible { display: block; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="back" href="/capture">← Back</a>
+  <h1>Inspection Summary</h1>
+</div>
+
+<div class="content">
+
+  <div class="overall-banner overall-{{ overall }}">
+    <div class="overall-label">{{ inspection.building_name }} · {{ inspection.inspection_date }}</div>
+    <div class="overall-status">
+      {% if overall == "PASS" %}✓ All items compliant
+      {% elif overall == "FAIL" %}✗ Critical deficiencies found
+      {% else %}⚠ Deficiencies require attention
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat stat-critical">
+      <div class="stat-num">{{ critical }}</div>
+      <div class="stat-label">Critical</div>
+    </div>
+    <div class="stat stat-major">
+      <div class="stat-num">{{ major }}</div>
+      <div class="stat-label">Major</div>
+    </div>
+    <div class="stat stat-minor">
+      <div class="stat-num">{{ minor }}</div>
+      <div class="stat-label">Minor</div>
+    </div>
+  </div>
+
+  <div class="section-title">{{ analyses|length }} items inspected</div>
+
+  {% for a in analyses %}
+  <div class="item-card">
+    <div class="item-header">
+      <div class="status-dot dot-{{ a.overall_status }}"></div>
+      <div class="item-type">{{ a.equipment_type or "Unknown equipment" }}</div>
+    </div>
+    {% if a._location_hint %}
+    <div class="item-location">📍 {{ a._location_hint }}</div>
+    {% endif %}
+    {% if a.deficiencies %}
+    <div class="def-chips" style="margin-top:8px;">
+      {% for d in a.deficiencies %}
+      <span class="def-chip chip-{{ d.severity }}">{{ d.severity }}: {{ d.nfpa_code }}</span>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+
+  <div style="margin-top: 16px;">
+    <button class="btn-add" onclick="window.location='/capture'">+ Add more items</button>
+    <button class="btn-generate" id="report-btn" onclick="generateReport()">
+      Generate NFPA Report →
+    </button>
+    <div class="spinner" id="report-spinner">Generating report with AI...</div>
+    <div class="report-output" id="report-output"></div>
+  </div>
+
+</div>
+
+<div class="bottom-nav">
+  <a class="nav-btn" href="/capture">
+    <div class="nav-btn-icon">📷</div>
+    Capture
+  </a>
+  <a class="nav-btn active" href="/inspection/summary">
+    <div class="nav-btn-icon">📋</div>
+    Summary
+  </a>
+</div>
+
+<script>
+async function generateReport() {
+  const btn = document.getElementById('report-btn');
+  const spinner = document.getElementById('report-spinner');
+  const output = document.getElementById('report-output');
+
+  btn.disabled = true;
+  btn.textContent = 'Generating...';
+  spinner.classList.add('visible');
+  output.style.display = 'none';
+
+  try {
+    const response = await fetch('/report/generate', { method: 'POST' });
+    const data = await response.json();
+
+    spinner.classList.remove('visible');
+
+    if (data.error) {
+      alert('Error: ' + data.error);
+      btn.disabled = false;
+      btn.textContent = 'Generate NFPA Report →';
+      return;
+    }
+
+    output.textContent = data.narrative;
+    output.style.display = 'block';
+    btn.textContent = 'Report Generated ✓';
+    output.scrollIntoView({ behavior: 'smooth' });
+
+  } catch (err) {
+    spinner.classList.remove('visible');
+    alert('Network error generating report.');
+    btn.disabled = false;
+    btn.textContent = 'Generate NFPA Report →';
+  }
+}
+</script>
+
+</body>
+</html>
